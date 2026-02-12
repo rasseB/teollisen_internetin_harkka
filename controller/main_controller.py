@@ -35,7 +35,7 @@ def send_command(device, routine, pos=None):
     send_to_web(device, routine, "Aloitetaan...", None)
 
     # Otetaan aloitusaika talteen
-    start_time = time.time()
+    start_time = time.perf_counter()
 
     command_data = {"device": device, "routine": routine}
     if pos is not None:
@@ -51,7 +51,7 @@ def send_command(device, routine, pos=None):
             response = json.loads(raw_data.decode('utf-8'))
             
             # Otetaan lopetusaika
-            end_time = time.time()
+            end_time = time.perf_counter()
             duration = end_time - start_time
 
             if response.get("result") == "ok":
@@ -119,4 +119,20 @@ def main():
     send_to_web("Järjestelmä", "Työkierto valmistui", "LOPPU")
 
 if __name__ == "__main__":
-    main()
+    KIERROSTEN_MAARA = 3  # Muuta tätä numeroa haluamaksesi
+    
+    print(f"🔄 Ajetaan {KIERROSTEN_MAARA} tuotantokierrosta peräkkäin...\n")
+    
+    for kierros_nro in range(1, KIERROSTEN_MAARA + 1):
+        print(f"\n{'='*60}")
+        print(f"🏭 KIERROS {kierros_nro}/{KIERROSTEN_MAARA}")
+        print(f"{'='*60}\n")
+        
+        main()
+        
+        # Pieni tauko kierrosten välissä (paitsi viimeisen jälkeen)
+        if kierros_nro < KIERROSTEN_MAARA:
+            print("\n⏸️  Tauko ennen seuraavaa kierrosta...\n")
+            time.sleep(3)
+    
+    print(f"\n🎉 Kaikki {KIERROSTEN_MAARA} kierrosta suoritettu!")
