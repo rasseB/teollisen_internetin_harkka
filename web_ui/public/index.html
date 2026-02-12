@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+    <meta charset="UTF-8">
+    <title>Tehdas Status & Mittaus</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e1e; color: #f0f0f0; text-align: center; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        
+        .card { background: #2d2d2d; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border: 1px solid #444; }
+        h1 { color: #4CAF50; margin-bottom: 10px; }
+        h2 { color: #fff; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        
+        /* Status Text */
+        #status-box { font-size: 20px; font-weight: bold; color: #FFD700; min-height: 1.2em; }
+        
+        /* Table Styles */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #444; }
+        th { background-color: #333; color: #4CAF50; }
+        tr:hover { background-color: #3a3a3a; }
+        
+        .status-running { color: #FFA500; }
+        .status-done { color: #4CAF50; font-weight: bold; }
+        .status-error { color: #FF5252; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🏭 Tehtaan Monitorointi</h1>
+
+        <div class="card">
+            <h2>Nyt tapahtuu</h2>
+            <div id="status-box">Odotetaan käynnistystä...</div>
+        </div>
+
+        <div class="card">
+            <h2>⏱️ Suoritusajat (Mittausdata)</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Aika</th>
+                        <th>Laite</th>
+                        <th>Toimenpide</th>
+                        <th>Tila</th>
+                        <th>Kesto (s)</th>
+                    </tr>
+                </thead>
+                <tbody id="results-table">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const statusBox = document.getElementById('status-box');
+        const tableBody = document.getElementById('results-table');
+
+        socket.on('status_update', (data) => {
+            // 1. Päivitetään yläosan live-teksti
+            statusBox.innerText = `${data.device} -> ${data.action} (${data.status})`;
+            statusBox.className = data.status === "Aloitetaan..." ? "status-running" : "status-done";
+
+            // 2. Jos toiminto on VALMIS, lisätään se taulukkoon
+            if (data.status === "VALMIS") {
+                addTableRow(data);
+            }
+        });
+
+        function addTableRow(data) {
+            const row = document.createElement('tr');
+            
+            // Kellonaika
+            const timeCell = document.createElement('td');
+            timeCell.innerText = new Date().toLocaleTimeString();
+            
+            // Laite
+            const deviceCell = document.createElement('td');
+            deviceCell.innerText = data.device;
+            
+            // Toiminto
+            const actionCell = document.createElement('td');
+            actionCell.innerText = data.action;
+
+            // Tila
+            const statusCell = document.createElement('td');
+            statusCell.innerText = data.status;
+            statusCell.className = "status-done";
+
+            // Kesto
+            const durationCell = document.createElement('td');
+            durationCell.innerText = data.duration + " s";
+            durationCell.style.color = "#fff";
+
+            row.appendChild(timeCell);
+            row.appendChild(deviceCell);
+            row.appendChild(actionCell);
+            row.appendChild(statusCell);
+            row.appendChild(durationCell);
+
+            // Lisätään taulukon alkuun (uusin ensin)
+            tableBody.prepend(row);
+        }
+    </script>
+</body>
+</html>

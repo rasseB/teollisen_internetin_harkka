@@ -23,6 +23,15 @@ wheels/
 .installed.cfg
 *.egg
 
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+.npm
+.yarn
+
 # IDE
 .vscode/
 .idea/
@@ -33,3 +42,8 @@ wheels/
 # OS
 .DS_Store
 Thumbs.db
+
+# Build outputs
+dist/
+dist-ssr/
+*.local
