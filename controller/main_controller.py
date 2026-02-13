@@ -19,7 +19,7 @@ def send_to_web(device, routine, status="info", duration=None):
             "device": device,
             "action": routine,
             "status": status,
-            "duration": round(duration, 2) if duration is not None else 0 # Pyöristetään 2 desimaaliin
+            "duration": round(duration, 2) if duration is not None else 0
         }
         requests.post(WEB_SERVER_URL, json=payload, timeout=0.1)
     except Exception:
@@ -83,8 +83,6 @@ def main():
     # 2. LATAUSASEMA: Siirretään paletti sisään hyllystöhissin noudettavaksi
     if not send_command("lstat", "moveIn"): return
 
-    # --- TÄSSÄ ON SE KORJAUS JONKA TEIT (Ovien avaus ensin) ---
-    
     # 3. KONEISTUSKESKUS: Avataan ovet valmiiksi
     if not send_command("mcent", "openDoors"): return
 
@@ -96,13 +94,11 @@ def main():
     if not send_command("mcent", "closeDoors"): return
     
     print("   --- Koneistus käynnissä (simuloitu) ---")
-    send_to_web("Koneistuskeskus", "Työstää kappaletta...", "KÄYNNISSÄ") # Web-lisäys
+    send_to_web("Koneistuskeskus", "Työstää kappaletta...", "KÄYNNISSÄ")
     time.sleep(2) 
     
     # Avataan ovet työstön jälkeen
     if not send_command("mcent", "openDoors"): return
-
-    # --- KORJAUS PÄÄTTYY ---
 
     # 6. HYLLYSTÖHISSI: Palautetaan paletti koneelta latausasemalle
     if not send_command("crane", "pickFromMC"): return

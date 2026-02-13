@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import io from 'socket.io-client'
 import {
   Chart as ChartJS,
@@ -29,15 +29,18 @@ function App() {
   const [currentAction, setCurrentAction] = useState(null);
   const [history, setHistory] = useState([]);
   const [totalDuration, setTotalDuration] = useState(0);
-  const [cycleHistory, setCycleHistory] = useState([]); // Tallennetaan valmiit kierrokset
-  const [lastSavedCycle, setLastSavedCycle] = useState(0); // Estää duplikaatit
+  const [cycleHistory, setCycleHistory] = useState([]);
+  const [currentCycleNumber, setCurrentCycleNumber] = useState(1);
+  
+  const totalDurationRef = useRef(0);
+  const chartContainerRef = useRef(null);
   
   // Chartin data-state
   const [chartData, setChartData] = useState({
     labels: [],
     datasets: [
       {
-        label: 'Kesto (ms)', // MUUTOS: Label on nyt ms
+        label: 'Kesto (ms)',
         data: [],
         backgroundColor: 'rgba(76, 175, 80, 0.6)',
         borderColor: 'rgba(76, 175, 80, 1)',
@@ -48,83 +51,67 @@ function App() {
 
   useEffect(() => {
     socket.on("status_update", (data) => {
-      // DEBUG: Tulostetaan mitä data sisältää
-      console.log("📩 Saatu data:", data);
-      
-      // UUSI KIERROS ALKAA: Kun tulee ensimmäinen vaihe (robot pickFromEP)
+      // Uusi kierros alkaa
       if (data.device === "robot" && data.action === "pickFromEP" && data.status !== "VALMIS") {
-        console.log("🔄 UUSI KIERROS ALKAA - Nollataan kokonaisaika!");
+        // Jos edellinen kierros on valmis (ei ensimmäinen kerta), kasvata kierrosnumeroa
+        if (totalDurationRef.current > 0) {
+          setCurrentCycleNumber((prev) => prev + 1);
+        }
         
-        // Nollataan vain kokonaisaika uudelle kierrokselle
-        // HUOM: Historia ja kaavio jatkavat kasvamista!
         setTotalDuration(0);
+        totalDurationRef.current = 0;
       }
       
-      // KIERROS LOPPUU: Kun saadaan "LOPPU" status
+      // Kierros valmis - tallenna historiaan
       if (data.status === "LOPPU") {
-        console.log("🏁 KIERROS VALMIS!");
+        const currentTotal = totalDurationRef.current;
         
-        setTotalDuration((currentTotal) => {
-          if (currentTotal > 0) {
-            // Tarkista ettei tallenneta samaa kierrosta kahdesti
-            setLastSavedCycle((lastSaved) => {
-              if (currentTotal !== lastSaved) {
-                setCycleHistory((prevCycles) => [
-                  { 
-                    cycleNumber: prevCycles.length + 1,
-                    duration: currentTotal, 
-                    timestamp: new Date().toLocaleTimeString() 
-                  },
-                  ...prevCycles
-                ]);
-                console.log("💾 Kierros tallennettu historiaan:", currentTotal, "ms");
-                return currentTotal; // Päivitä viimeksi tallennettu
-              }
-              console.log("⚠️ Kierros oli jo tallennettu, skip");
-              return lastSaved;
-            });
-          }
-          return currentTotal; // Säilytetään arvo näytöllä kunnes uusi kierros alkaa
-        });
+        if (currentTotal > 0) {
+          setCycleHistory((prevCycles) => {
+            const timestamp = new Date().toLocaleTimeString();
+            
+            // Estä duplikaatit
+            if (prevCycles.length > 0 && prevCycles[0].duration === currentTotal) {
+              return prevCycles;
+            }
+            
+            return [{
+              cycleNumber: prevCycles.length + 1,
+              duration: currentTotal,
+              timestamp: timestamp
+            }, ...prevCycles];
+          });
+        }
       }
       
-      // 1. Päivitetään "Nyt tapahtuu" -tieto
+      // Päivitä nykyinen toiminto
       setCurrentAction(data);
 
-      // 2. Jos toiminto on VALMIS, lisätään se historiaan JA kaavioon
+      // Kun toiminto valmis, lisää historiaan ja kaavioon
       if (data.status === "VALMIS") {
-        
-        // MUUTOS: Muutetaan sekunnit millisekunneiksi ja pyöristetään
         const durationMs = Math.round(data.duration * 1000);
-        console.log("✅ VALMIS - Kesto ms:", durationMs);
 
-        // Lisätään taulukkoon (tallennetaan ms-arvo historiaan)
         setHistory((prev) => [
-          { ...data, duration: durationMs, timestamp: new Date().toLocaleTimeString() }, 
+          { ...data, duration: durationMs, timestamp: new Date().toLocaleTimeString() },
           ...prev
         ]);
 
-        // Päivitetään kokonaisaika
         setTotalDuration((prev) => {
           const newTotal = prev + durationMs;
-          console.log("🕒 Kokonaisaika päivitetty:", prev, "→", newTotal);
+          totalDurationRef.current = newTotal;
           return newTotal;
         });
 
-        // Lisätään kaavioon uusi pylväs (kierrosnumerolla varustettuna)
         setChartData((prevChart) => {
-          const currentCycle = cycleHistory.length + 1;
-          const newLabels = [...prevChart.labels, `K${currentCycle} ${data.device}: ${data.action}`];
+          const newLabels = [...prevChart.labels, `K${currentCycleNumber} ${data.device}: ${data.action}`];
           const newData = [...prevChart.datasets[0].data, durationMs];
 
           return {
             labels: newLabels,
-            datasets: [
-              {
-                ...prevChart.datasets[0],
-                data: newData,
-              },
-            ],
+            datasets: [{
+              ...prevChart.datasets[0],
+              data: newData,
+            }],
           };
         });
       }
@@ -132,6 +119,13 @@ function App() {
 
     return () => socket.off("status_update");
   }, []);
+
+  // Scrollaa kaavio automaattisesti oikealle kun uutta dataa tulee
+  useEffect(() => {
+    if (chartContainerRef.current) {
+      chartContainerRef.current.scrollLeft = chartContainerRef.current.scrollWidth;
+    }
+  }, [chartData]);
 
   // Kaavion asetukset
   const options = {
@@ -191,8 +185,10 @@ function App() {
 
       {/* Alaosa: Kaavio ja Taulukko */}
       <div className="bottom-row">
-        <div className="card chart-card">
-          <Bar options={options} data={chartData} />
+        <div className="card chart-card" ref={chartContainerRef}>
+          <div style={{ minWidth: Math.max(600, chartData.labels.length * 60) + 'px', height: '100%' }}>
+            <Bar options={options} data={chartData} />
+          </div>
         </div>
 
         <div className="card history-card">
