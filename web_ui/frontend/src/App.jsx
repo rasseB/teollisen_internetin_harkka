@@ -30,7 +30,6 @@ function App() {
   const [history, setHistory] = useState([]);
   const [totalDuration, setTotalDuration] = useState(0);
   const [cycleHistory, setCycleHistory] = useState([]);
-  const [currentCycleNumber, setCurrentCycleNumber] = useState(1);
   
   const totalDurationRef = useRef(0);
   const chartContainerRef = useRef(null);
@@ -53,11 +52,6 @@ function App() {
     socket.on("status_update", (data) => {
       // Uusi kierros alkaa
       if (data.device === "robot" && data.action === "pickFromEP" && data.status !== "VALMIS") {
-        // Jos edellinen kierros on valmis (ei ensimmäinen kerta), kasvata kierrosnumeroa
-        if (totalDurationRef.current > 0) {
-          setCurrentCycleNumber((prev) => prev + 1);
-        }
-        
         setTotalDuration(0);
         totalDurationRef.current = 0;
       }
@@ -103,7 +97,7 @@ function App() {
         });
 
         setChartData((prevChart) => {
-          const newLabels = [...prevChart.labels, `K${currentCycleNumber} ${data.device}: ${data.action}`];
+          const newLabels = [...prevChart.labels, `${data.device}: ${data.action}`];
           const newData = [...prevChart.datasets[0].data, durationMs];
 
           return {
